@@ -11,4 +11,4 @@ RUN apt-get update && \
     mkdir -p credit_card_customer_churn/images/results
 
 ENTRYPOINT ["python"]
-CMD ["credit_card_customer_churn"]
+CMD ["churn_library_test.py"]
