@@ -6,18 +6,25 @@ Author: Jonathan Cabreira
 Date: 11/1/2021
 '''
 # import libraries
+#import shap
 import os
-from sklearn.metrics import classification_report
-from sklearn.model_selection import GridSearchCV
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+os.environ['QT_QPA_PLATFORM']='offscreen'
+
 import joblib
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set()
+import seaborn as sns; sns.set()
+
+from sklearn.preprocessing import normalize
+from sklearn.model_selection import train_test_split
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.metrics import plot_roc_curve, classification_report
+import os
 
 
 def import_data(pth):
@@ -34,7 +41,8 @@ def import_data(pth):
     return df
 
 def perform_basic_eda(df):
-     '''
+    
+    '''
     perform basic eda on df 
     input:
             df: pandas dataframe
@@ -44,7 +52,7 @@ def perform_basic_eda(df):
     '''
     print('DataFrame shape {}'.format(df.shape))
     print('Total of Null Features :\n{}',format(df.isnull().sum()))
-    print('Statistics: \n{}.'format(df.describe()))
+    print('Statistics: \n{}'.format(df.describe()))
     
 def perform_eda(df):
     '''
@@ -68,11 +76,11 @@ def perform_eda(df):
             df['Customer_Age'].hist();
         elif column == 'Marital_Status':
             df.Marital_Status.value_counts('normalize').plot(kind='bar');
-        elif column == 'Total_Trans_Ct':
-            sns.distplot(df['Total_Trans_Ct']);
-        elif columns == 'Heatmap':
+       # elif column == 'Total_Trans':
+           # sns.distplot(df['Total_Trans_Ct']);
+        elif column == 'Heatmap':
             sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths = 2)
-        plt.savefig("images/eda/{}.jpg".format(column))
+        plt.savefig("./images/eda/{}.jpg".format(column))
         plt.close()
             
 
@@ -84,17 +92,21 @@ def encoder_helper(df, category_lst, response):
     input:
             df: pandas dataframe
             category_lst: list of columns that contain categorical features
-            response: string of response name [optional argument that could be used for naming variables or index y column]
+            response: string of response name
 
     output:
-            df: pandas dataframe with new columns for
+            df: pandas dataframe with new columns 
     '''
     for column in category_lst:
         column_lst = []
-        column_groups = df.groupby(column).mean()['Churn']
+        column_groups = df.groupby(column).mean()[response]
+        
         for val in df[column]:
             column_lst.append(column_groups.loc[val])
-        df['{}_{}'.format(column, 'churn')] = category_lst
+         
+        new_col = '{}_{}'.format(column, response)
+        df[new_col] = column_lst
+        
     return df
         
 def keep_columns():
@@ -107,7 +119,7 @@ def keep_columns():
                 List of columns to keep
     
     '''
-    keep_columns =  ['Customer_Age', 'Dependent_count', 'Months_on_book',
+    keep_columns_lst =  ['Customer_Age', 'Dependent_count', 'Months_on_book',
                      'Total_Relationship_Count', 'Months_Inactive_12_mon',
                      'Contacts_Count_12_mon', 'Credit_Limit', 'Total_Revolving_Bal',
                      'Avg_Open_To_Buy', 'Total_Amt_Chng_Q4_Q1', 'Total_Trans_Amt',
@@ -115,9 +127,9 @@ def keep_columns():
                      'Gender_Churn', 'Education_Level_Churn', 'Marital_Status_Churn', 
                      'Income_Category_Churn', 'Card_Category_Churn']
     
-    return  list_columns
+    return  keep_columns_lst
 
-def perform_feature_engineering(df, response = False):
+def perform_feature_engineering(df, response):
     '''
     input:
               df: pandas dataframe
@@ -129,21 +141,30 @@ def perform_feature_engineering(df, response = False):
               y_train: y training data
               y_test: y testing data
     '''
+    keep_cols = keep_columns()
+    cat_columns = ['Gender',
+                   'Education_Level',
+                   'Marital_Status',
+                   'Income_Category',
+                   'Card_Category']
+    
     y = df['Churn']
     X = pd.DataFrame()
+    df = encoder_helper(df, cat_columns, response)
     
-    keep_cols = keep_columns()
-    
+   
     X[keep_cols] = df[keep_cols]
     
     # train test split 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.3,   random_state=42)
     
-    return x_train, x_test, y_train, y_test
+    return X_train, X_test, y_train, y_test
     
     
-def random_forest_classifier(y_train, y_test):
-     '''
+def random_forest_classifier(X_train,X_test, y_train):
+    
+    
+    '''
      Perform a random forst classifier
      
     input:
@@ -152,6 +173,7 @@ def random_forest_classifier(y_train, y_test):
     output:
               y_train_preds_rf: Y training predictions of random forest model
               y_test_preds_rf: Y testing predictions of random forest model
+              cv_rfc: The model artifact
     '''
     
     rfc = RandomForestClassifier(random_state=42)
@@ -169,7 +191,7 @@ def random_forest_classifier(y_train, y_test):
     y_train_preds_rf = cv_rfc.best_estimator_.predict(X_train)
     y_test_preds_rf = cv_rfc.best_estimator_.predict(X_test)
     
-    return y_train_preds_rf, y_test_preds_rf
+    return y_train_preds_rf, y_test_preds_rf, cv_rfc
     
 def random_forest_report(y_train,y_test,y_train_preds_rf,y_test_preds_rf):
     '''
@@ -184,18 +206,17 @@ def random_forest_report(y_train,y_test,y_train_preds_rf,y_test_preds_rf):
               None
     '''
     # scores
-    plt.rc("figure", figsize=(5, 5))
-    plt.text(0.01, 1.25, 'Random Forest', {"fontsize": 10}, fontproperties="monospace")
-    plt.text(0.01, 0.05, str(classification_report(y_train, cy_train_preds_rf)), 
-    {"fontsize": 10}, fontproperties="monospace")
-    
-    plt.text(0.01, 0.6, 'Random Forest Test', {"fontsize": 10}, fontproperties="monospace")
-    plt.text(0.01, 0.7, str(classification_report(y_test, y_train_preds_rf)), {
-    "fontsize": 10}, fontproperties="monospace")
-    
-    plt.axis("off")
-    plt.savefig("images/results/{}.jpg".format('Random Forest') )
-    plt.close() 
+    plt.figure()
+    plt.rc('figure', figsize=(8, 8))
+    plt.text(0.01, 0.05, str(classification_report(y_test, y_test_preds_rf)), {
+        'fontsize': 10}, fontproperties='monospace') 
+    plt.text(0.01, 0.6, str('Random Forest Test (below) Random Forest Train (above)'), {
+        'fontsize': 10}, fontproperties='monospace')
+    plt.text(0.01, 0.7, str(classification_report(y_train, y_train_preds_rf)), {
+        'fontsize': 10}, fontproperties='monospace')  
+    plt.axis('off')
+    plt.savefig('./images/results/rf_results.png')
+    plt.close()
     
 def logistic_regression_report(y_train,y_test,y_train_preds_lr,y_test_preds_lr):
     '''
@@ -210,21 +231,20 @@ def logistic_regression_report(y_train,y_test,y_train_preds_lr,y_test_preds_lr):
               None
     '''
     # scores
-    plt.rc("figure", figsize=(5, 5))
-    plt.text(0.01, 1.25, 'Logistic Regression', {"fontsize": 10}, fontproperties="monospace")
-    plt.text(0.01, 0.05, str(classification_report(y_train, cy_train_preds_lr)), 
-    {"fontsize": 10}, fontproperties="monospace")
-    
-    plt.text(0.01, 0.6, 'Logistit Regression Test', {"fontsize": 10}, fontproperties="monospace")
-    plt.text(0.01, 0.7, str(classification_report(y_test, y_train_preds_lr)), {
-    "fontsize": 10}, fontproperties="monospace")
-    
-    plt.axis("off")
-    plt.savefig("images/results/{}.jpg".format('Logistic Regression') )
-    plt.close()    
+    plt.figure()
+    plt.rc('figure', figsize=(8, 8))
+    plt.text(0.01, 0.05, str(classification_report(y_train, y_train_preds_lr)), {
+        'fontsize': 10}, fontproperties='monospace')  
+    plt.text(0.01, 0.6, str('Logistic Regression Test (below) Logistic Regression Train (above)'), {
+        'fontsize': 10}, fontproperties='monospace')
+    plt.text(0.01, 0.7, str(classification_report(y_test, y_test_preds_lr)), {
+        'fontsize': 10}, fontproperties='monospace')  
+    plt.axis('off')
+    plt.savefig('./images/results/logistic_results.png')
+    plt.close()   
 
     
-def logistic_regression_classififer(y_train,y_test):
+def logistic_regression_classififer(X_train,X_test, y_train):
     '''
     Perform a logistic regression classifier
     
@@ -234,6 +254,7 @@ def logistic_regression_classififer(y_train,y_test):
     output:
               y_train_preds_rf: Y training predictions of random forest model
               y_test_preds_rf: Y testing predictions of random forest model
+              lrc: The model artifact
     '''
     
     lrc = LogisticRegression()
@@ -242,17 +263,14 @@ def logistic_regression_classififer(y_train,y_test):
     y_train_preds_lr = lrc.predict(X_train)
     y_test_preds_lr = lrc.predict(X_test)
     
-    return y_train_preds_lr, y_test_preds_lr
+    return y_train_preds_lr, y_test_preds_lr, lrc
     
 def classification_report_image(y_train,
                                 y_test,
                                 y_train_preds_lr,
                                 y_train_preds_rf,
                                 y_test_preds_lr,
-                                y_test_preds_rf,
-                                models_lst,
-                               export_classification_plots = False
-                               ):
+                                y_test_preds_rf ):
     '''
     produces classification report for training and testing results and stores report as image
     in images folder
@@ -275,34 +293,34 @@ def classification_report_image(y_train,
     random_forest_report(y_train,y_test,y_train_preds_rf,y_test_preds_rf)
     logistic_regression_report(y_train,y_test,y_train_preds_lr,y_test_preds_lr)
      
-def roc_curve_plots(X_test,Y_test,models_dict):
+def roc_curve_plots(X_test,y_test,models_dict):
     '''
     Plots roc curve of the models
     input:
             model_dict: dictionary with model objects containing feature_importances_
             X_test:
-            Y_test:
+            y_test:
 
     output:
              None
     '''
     
-    for model_name, model in models.items():
+    for model_name, model in models_dict.items():
         plt.figure(figsize=(20, 5))
         rc_plot = plot_roc_curve(model, X_test, y_test)
         plt.title("{} Roc Curve".format(model_name))
         plt.ylabel("True Positive Rate")
         plt.savefig("images/results/{}_Roc_Curve.jpg".format(str(model_name)) )
-        plt.show()
+        #plt.show()
         
      
     plt.figure(figsize=(15, 8))
     plt.title("Random Forest best Estimator Roc Curve")
     ax = plt.gca()
-    disp = plot_roc_curve(models['Random Forest'].best_estimator_, X_test, y_test, ax=ax, alpha=0.8)
+    disp = plot_roc_curve(models_dict['Random Forest'].best_estimator_, X_test, y_test, ax=ax, alpha=0.8)
     rc_plot.plot(ax=ax, alpha=0.8)
     plt.savefig("images/results/{}_Roc_Curve.jpg".format(str('Random Forest best Estimator')) )
-    plt.show()
+    #plt.show()
     plt.close()
     
 def feature_importance_plot(model, X_data, output_pth):
@@ -317,14 +335,19 @@ def feature_importance_plot(model, X_data, output_pth):
     output:
              None
     '''
-    if not os.path(output_pth):
+    if not os.path.exists(output_pth):
         os.makedirs(output_pth)
+
+    importances = model.best_estimator_.feature_importances_
+    indices = np.argsort(importances)[::-1]
+    names = [X_data.columns[i] for i in indices]
+
         
     plt.figure(figsize=(20, 5))
     plt.title("Feature Importance")
     plt.ylabel("Importance")
-    plt.bar(range(x_data.shape[1]), importances[indices])
-    plt.xticks(range(x_data.shape[1]), names, rotation=90)
+    plt.bar(range(X_data.shape[1]), importances[indices])
+    plt.xticks(range(X_data.shape[1]), names, rotation=90)
     plt.savefig(os.path.join(output_pth,"Feature_Importance.jpg"))
     plt.close()
         
@@ -340,4 +363,34 @@ def train_models(X_train, X_test, y_train, y_test):
     output:
               None
     '''
-    pass
+    y_train_preds_rf, y_test_preds_rf,cv_rfc  = random_forest_classifier(X_train,X_test, y_train)
+    y_train_preds_lr, y_test_preds_lr, lrc = logistic_regression_classififer(X_train,X_test, y_train)
+    
+    classification_report_image(y_train,
+                                y_test,
+                                y_train_preds_lr,
+                                y_train_preds_rf,
+                                y_test_preds_lr,
+                                y_test_preds_rf )
+    
+     
+    models_dict = {'Random Forest': cv_rfc,
+          'Logistic Regression': lrc}
+    
+    roc_curve_plots(X_test,y_test,models_dict )    
+    
+    
+    feature_importance_plot(cv_rfc , X_train, './images/results/')
+    
+    joblib.dump(cv_rfc.best_estimator_, "models/rfc_model.pkl")
+    joblib.dump(lrc, "models/logistic_model.pkl")
+    
+
+if __name__ == "__main__":
+    df = import_data("data/bank_data.csv")
+    perform_eda(df)
+    
+    print('perform_feature_engineering')
+    x_train_, x_test_, y_train_, y_test_ = perform_feature_engineering(df, 'Churn')
+    
+    train_models(x_train_, x_test_, y_train_, y_test_)
