@@ -74,6 +74,10 @@ def perform_eda(df):
         "Heatmap"]
 
     # perform_basic_eda(df)
+    
+    img_eda_pth =  "./images/eda/"
+    if not os.path.exists(img_eda_pth):
+        os.makedirs(img_eda_pth)
 
     for column in plotting_columns:
         plt.figure(figsize=(20, 10))
@@ -96,8 +100,7 @@ def perform_eda(df):
         # plot Heatmap
         elif column == 'Heatmap':
             sns.heatmap(df.corr(), annot=False, cmap='Dark2_r', linewidths=2)
-
-        plt.savefig("./images/eda/{}.jpg".format(column))
+        plt.savefig(os.path.join(img_eda_pth,"{}.jpg".format(column)))
         plt.close()
 
 
@@ -250,7 +253,12 @@ def random_forest_report(y_train, y_test, y_train_preds_rf, y_test_preds_rf):
                 y_train, y_train_preds_rf)), {
             'fontsize': 10}, fontproperties='monospace')
     plt.axis('off')
-    plt.savefig('./images/results/rf_results.png')
+    
+    result_pth = "./images/results/"
+    if not os.path.exists(result_pth):
+        os.makedirs(result_pth)
+        
+    plt.savefig(os.path.join(result_pth,'rf_results.png'))
     plt.close()
 
 
@@ -284,7 +292,12 @@ def logistic_regression_report(
     plt.text(0.01, 0.7, str(classification_report(y_test, y_test_preds_lr)), {
         'fontsize': 10}, fontproperties='monospace')
     plt.axis('off')
-    plt.savefig('./images/results/logistic_results.png')
+    
+    result_pth = "./images/results/"
+    if not os.path.exists(result_pth):
+        os.makedirs(result_pth)
+        
+    plt.savefig(os.path.join(result_pth,'logistic_results.png'))
     plt.close()
 
 
@@ -352,7 +365,10 @@ def roc_curve_plots(X_test, y_test, models_dict):
     output:
              None
     '''
-
+    
+    result_pth = './images/results/'
+  
+    
     for model_name, model in models_dict.items():
         plt.figure(figsize=(20, 5))
         rc_plot = plot_roc_curve(model, X_test, y_test)
@@ -371,9 +387,7 @@ def roc_curve_plots(X_test, y_test, models_dict):
         ax=ax,
         alpha=0.8)
     rc_plot.plot(ax=ax, alpha=0.8)
-    plt.savefig(
-        "images/results/{}_Roc_Curve.jpg".format(str('Random Forest best Estimator')))
-    # plt.show()
+    plt.savefig( os.path.join(result_pth, "{}_Roc_Curve.jpg".format('Random Forest best Estimator')))
     plt.close()
 
 
@@ -431,8 +445,17 @@ def train_models(X_train, X_test, y_train, y_test):
                    'Logistic Regression': lrc}
 
     roc_curve_plots(X_test, y_test, models_dict)
+    
+    result_pth = './images/results/'
+    
+    if not os.path.exists(result_pth):
+        os.makedirs(result_pth)
 
     feature_importance_plot(cv_rfc, X_train, './images/results/')
+    
+    model_pth = "models/"
+    if not os.path.exists(model_pth):
+        os.makedirs(model_pth)
 
     joblib.dump(cv_rfc.best_estimator_, "models/rfc_model.pkl")
     joblib.dump(lrc, "models/logistic_model.pkl")

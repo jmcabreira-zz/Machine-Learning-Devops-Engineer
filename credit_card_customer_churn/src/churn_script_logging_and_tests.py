@@ -39,8 +39,13 @@ def test_eda(perform_eda, df):
     '''
     test perform eda function
     '''
-    perform_eda(df)
-    path = "./images/eda"
+    try:
+        perform_eda(df)
+        path = "./images/eda"
+    except AssertionError as err:
+        logging.error("Error in perform_eda function")
+        
+        raise err
 
     # Checking if the list is empty or not
     try:
@@ -59,10 +64,15 @@ def test_encoder_helper(encoder_helper,df):
     test encoder helper
     '''
     
-    cat_columns = ['Gender', 'Education_Level', 'Marital_Status',
-                   'Income_Category', 'Card_Category']
+    try:
+        cat_columns = ['Gender', 'Education_Level', 'Marital_Status',
+                       'Income_Category', 'Card_Category']
 
-    df = encoder_helper(df, cat_columns, 'Churn')
+        df = encoder_helper(df, cat_columns, 'Churn')
+    except AssertionError as err:
+        logging.error("Error in encoder_helper function!")
+        
+        raise err
 
     try:
         for col in cat_columns:
@@ -81,7 +91,14 @@ def test_perform_feature_engineering(perform_feature_engineering,df):
     '''
     test perform_feature_engineering
     '''
-    X_train, X_test, y_train, y_test = perform_feature_engineering(df, 'Churn')
+    
+    try:
+        X_train, X_test, y_train, y_test = perform_feature_engineering(df, 'Churn')
+    except AssertionError as err:
+        logging.error("Error in perform_feature_engineering function")
+        
+        raise err
+        
     try:
         assert X_train.shape[0] > 0
         assert X_test.shape[0] > 0
@@ -100,8 +117,14 @@ def test_train_models(train_models, X_train, X_test, y_train, y_test):
     '''
     test train_models
     '''
-    train_models(X_train, X_test, y_train, y_test)
-    path = "./images/results/"
+    try:
+        train_models(X_train, X_test, y_train, y_test)
+        path = "./images/results/"
+    except:
+        logging.error("Error in train_models function!")
+        
+        raise err
+        
     try:
         # Getting the list of directories
         dir_val = os.listdir(path)
