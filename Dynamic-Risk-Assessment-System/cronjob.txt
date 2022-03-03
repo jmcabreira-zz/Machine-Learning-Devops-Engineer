@@ -1,0 +1,1 @@
+10 * * * * python python 10 * * * * python /home/jonathan/Documents/ml-devops-eng/cabreira/Project_4/starter-file/fullprocess.py
